@@ -1,24 +1,41 @@
 const http = require('http');
-function calculatePi() {
-  let n = 22;
-  let sum = 0;
-  for (let i = 0; i < n; i++) {
-    sum += Math.pow(-1, i) / (2 * i + 1);
-  }
-  return sum * 4;
+const EventEmitter = require('events');
+const logger = require('./logger');
+class AppServer extends EventEmitter {
+constructor() {
+super();
+this.server = null;
+this.port = null;
 }
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  const name = 'Шинель Милана Андреевна';
-  const group = '478';
-  const pi = calculatePi();
-  res.end(
-    '<h1>Информация о студенте</h1>' +
-    '<p><strong>ФИО:</strong> ' + name + '</p>' +
-    '<p><strong>Группа:</strong> ' + group + '</p>' +
-    '<p><strong>Число Пи:</strong> ' + pi + '</p>'
-  );
+start(port) {
+this.port = port;
+this.server = http.createServer((req, res) => {
+this.emit('request:received', { url: req.url, method: req.method });
+res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+res.end('Hello from Event-Driven Server!');
 });
-server.listen(3000, function() {
-  console.log('Сервер на http://localhost:3000');
+this.server.listen(port, () => {
+this.emit('server:started', port);
 });
+}
+stop() {
+if (this.server) {
+this.server.close(() => {
+this.emit('server:stopped');
+});
+}}}
+const app = new AppServer();
+logger.setupLogger(app);
+app.on('server:started', (port) => {
+console.log(`Сервер запущен на порту ${port}`);
+});
+app.on('request:received', (data) => {
+console.log(`Получен запрос: ${data.method} ${data.url}`);
+});
+app.on('server:stopped', () => {
+console.log('Сервер остановлен');
+});
+app.start(3000);
+setTimeout(() => {
+app.stop();
+}, 10000);
